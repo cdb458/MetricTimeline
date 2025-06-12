@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metric Quest - Platformer Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    canvas { background: #202020; display: block; margin: 0 auto; border: 2px solid #fff; }
+    #quizBox {
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%
+      background: white;
+      padding: 20px;
+      border: 2px solid #000;
+      display: none;
+      font-family: sans-serif;
+    }
+    #quizBox button {
+      margin-top: 10px;
+    }
+    #progress {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      background: rgba(0,0,0,0.6);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_b71f1116f3.mp3?filename=arcade-mood-10959.mp3" autoplay loop></audio>
+  <canvas id="game" width="800" height="400"></canvas>
+  <div id="quizBox">
+    <p id="quizQuestion">Loading...</p>
+    <button onclick="answerQuiz(true)">Answer A</button>
+    <button onclick="answerQuiz(false)">Answer B</button>
+  </div>
+  <div id="progress">Stage: 1 / 5</div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const jumpSound = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+    const collectSound = new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
+    const failSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+
+    let stage = 0;
+
+    const stages = [
+      {
+        question: 'Who proposed the metric system during the French Revolution?',
+        correct: 'French scientists',
+        incorrect: 'Roman senators',
+        itemX: 450,
+        itemY: 190,
+        platforms: [
+          { x: 0, y: 350, w: 800, h: 50 },
+          { x: 200, y: 280, w: 100, h: 10 },
+          { x: 400, y: 220, w: 100, h: 10 },
+        ],
+        hazards: [{ x: 300, y: 340, w: 30, h: 10 }]
+      },
+      {
+        question: 'What is the base unit of length in the metric system?',
+        correct: 'meter',
+        incorrect: 'yard',
+        itemX: 600,
+        itemY: 290,
+        platforms: [
+          { x: 0, y: 350, w: 800, h: 50 },
+          { x: 300, y: 300, w: 100, h: 10 },
+          { x: 500, y: 250, w: 100, h: 10 },
+        ],
+        hazards: [{ x: 400, y: 340, w: 30, h: 10 }]
+      },
+      {
+        question: 'Which organization maintains the metric system today?',
+        correct: 'International Bureau of Weights and Measures',
+        incorrect: 'NASA',
+        itemX: 700,
+        itemY: 200,
+        platforms: [
+          { x: 0, y: 350, w: 800, h: 50 },
+          { x: 350, y: 280, w: 100, h: 10 },
+          { x: 650, y: 220, w: 100, h: 10 },
+        ],
+        hazards: [{ x: 200, y: 340, w: 30, h: 10 }]
+      },
+      {
+        question: 'How many millimeters are in a centimeter?',
+        correct: '10',
+        incorrect: '100',
+        itemX: 500,
+        itemY: 230,
+        platforms: [
+          { x: 0, y: 350, w: 800, h: 50 },
+          { x: 300, y: 270, w: 100, h: 10 },
+          { x: 450, y: 220, w: 100, h: 10 },
+        ],
+        hazards: [{ x: 250, y: 340, w: 30, h: 10 }]
+      },
+      {
+        question: 'Which of the following is a metric unit of temperature?',
+        correct: 'Celsius',
+        incorrect: 'Fahrenheit',
+        itemX: 550,
+        itemY: 180,
+        platforms: [
+          { x: 0, y: 350, w: 800, h: 50 },
+          { x: 200, y: 300, w: 100, h: 10 },
+          { x: 400, y: 250, w: 100, h: 10 },
+          { x: 600, y: 200, w: 100, h: 10 },
+        ],
+        hazards: [{ x: 320, y: 340, w: 30, h: 10 }]
+      }
+    ];
+
+    const player = { x: 50, y: 300, w: 40, h: 40, vy: 0, onGround: false };
+    const gravity = 1;
+    const keys = {};
+
+    let currentStage = stages[stage];
+    let itemCollected = false;
+
+    function drawPlayer() {
+      ctx.fillStyle = 'deepskyblue';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+    }
+
+    function drawPlatform(p) {
+      ctx.fillStyle = 'grey';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+    }
+
+    function drawHazard(h) {
+      ctx.fillStyle = 'red';
+      ctx.fillRect(h.x, h.y, h.w, h.h);
+    }
+
+    function drawItem() {
+      if (!itemCollected) {
+        ctx.fillStyle = 'gold';
+        ctx.beginPath();
+        ctx.arc(currentStage.itemX, currentStage.itemY, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function showQuiz() {
+      document.getElementById('quizQuestion').innerText = `Q: ${currentStage.question}\nA) ${currentStage.correct}\nB) ${currentStage.incorrect}`;
+      document.getElementById('quizBox').style.display = 'block';
+    }
+
+    function answerQuiz(correct) {
+      document.getElementById('quizBox').style.display = 'none';
+      if (correct) {
+        if (stage < stages.length - 1) {
+          stage++;
+          currentStage = stages[stage];
+          document.getElementById('progress').innerText = `Stage: ${stage + 1} / ${stages.length}`;
+          player.x = 50;
+          player.y = 300;
+          itemCollected = false;
+        } else {
+          alert('You completed the Metric Quest!');
+        }
+      } else {
+        failSound.play();
+        alert('Incorrect. Try again.');
+        player.x = 50;
+        player.y = 300;
+        itemCollected = false;
+      }
+    }
+
+    function update() {
+      if (keys['ArrowLeft']) player.x -= 4;
+      if (keys['ArrowRight']) player.x += 4;
+
+      player.vy += gravity;
+      player.y += player.vy;
+      player.onGround = false;
+
+      currentStage.platforms.forEach(p => {
+        if (player.x < p.x + p.w && player.x + player.w > p.x &&
+            player.y < p.y + p.h && player.y + player.h > p.y) {
+          player.y = p.y - player.h;
+          player.vy = 0;
+          player.onGround = true;
+        }
+      });
+
+      currentStage.hazards.forEach(h => {
+        if (player.x < h.x + h.w && player.x + player.w > h.x &&
+            player.y < h.y + h.h && player.y + player.h > h.y) {
+          failSound.play();
+          alert('Ouch! You hit a hazard. Restarting...');
+          player.x = 50;
+          player.y = 300;
+          itemCollected = false;
+        }
+      });
+
+      if (!itemCollected &&
+          player.x < currentStage.itemX + 10 && player.x + player.w > currentStage.itemX - 10 &&
+          player.y < currentStage.itemY + 10 && player.y + player.h > currentStage.itemY - 10) {
+        collectSound.play();
+        itemCollected = true;
+        showQuiz();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPlayer();
+      currentStage.platforms.forEach(drawPlatform);
+      currentStage.hazards.forEach(drawHazard);
+      drawItem();
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      if (e.key === 'ArrowUp' && player.onGround) {
+        player.vy = -15;
+        jumpSound.play();
+      }
+    });
+    document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    document.getElementById('progress').innerText = `Stage: ${stage + 1} / ${stages.length}`;
+    gameLoop();
+  </script>
+
+  <p style="text-align:center; font-family:sans-serif; margin-top:10px; color:white">
+    Use Arrow Keys to Move (← →) and Jump (↑). Collect metric units and answer quizzes to progress through history!
+  </p>
+<p style="text-align:center; font-family:sans-serif; margin-top:10px; color:white">
+    Created by Zahra
+  </p>
+</body>
+</html>
